@@ -1,0 +1,105 @@
+version: '3.8'
+
+services:
+  # MySQL Database
+  db:
+    image: mysql:8.0
+    container_name: mysql-db
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-Senha123}
+      MYSQL_DATABASE: meubanco
+      MYSQL_USER: appuser
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-AppSenha123}
+    volumes:
+      - ./banco.sql:/docker-entrypoint-initdb.d/init.sql
+      - mysql_data:/var/lib/mysql
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # PHP Application (3 instâncias para demonstrar escalabilidade)
+  app1:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    container_name: php-app-1
+    environment:
+      DB_HOST: db
+      DB_USER: appuser
+      DB_PASSWORD: ${MYSQL_PASSWORD:-AppSenha123}
+      DB_NAME: meubanco
+    volumes:
+      - ./app:/var/www/html
+    networks:
+      - frontend
+      - backend
+    depends_on:
+      db:
+        condition: service_healthy
+
+  app2:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    container_name: php-app-2
+    environment:
+      DB_HOST: db
+      DB_USER: appuser
+      DB_PASSWORD: ${MYSQL_PASSWORD:-AppSenha123}
+      DB_NAME: meubanco
+    volumes:
+      - ./app:/var/www/html
+    networks:
+      - frontend
+      - backend
+    depends_on:
+      db:
+        condition: service_healthy
+
+  app3:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    container_name: php-app-3
+    environment:
+      DB_HOST: db
+      DB_USER: appuser
+      DB_PASSWORD: ${MYSQL_PASSWORD:-AppSenha123}
+      DB_NAME: meubanco
+    volumes:
+      - ./app:/var/www/html
+    networks:
+      - frontend
+      - backend
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Nginx Load Balancer
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    container_name: nginx-lb
+    ports:
+      - "80:80"
+    networks:
+      - frontend
+    depends_on:
+      - app1
+      - app2
+      - app3
+
+networks:
+  frontend:
+    driver: bridge
+  backend:
+    driver: bridge
+
+volumes:
+  mysql_data:
+    driver: local
